@@ -1,0 +1,6 @@
+streamlit
+sqlalchemy
+psycopg2-binary
+geoalchemy2
+neo4j
+python-dotenv

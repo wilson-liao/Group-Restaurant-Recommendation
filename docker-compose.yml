@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with PostGIS extension for spatial queries
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: forksync_postgres
+    environment:
+      POSTGRES_USER: ${PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-password}
+      POSTGRES_DB: ${PG_DB:-postgres}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Mount our schema script so it automatically runs on first boot
+      - ./postgres/schemas/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    restart: unless-stopped
+
+  # Neo4j Graph Database
+  neo4j:
+    image: neo4j:5
+    container_name: forksync_neo4j
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-password}
+      # Accept license agreement (required for enterprise features if toggled, fine for community)
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
+    ports:
+      - "7474:7474" # HTTP Browser UI
+      - "7687:7687" # Bolt connection port
+    volumes:
+      - neo4j_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  neo4j_data:
