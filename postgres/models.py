@@ -1,7 +1,7 @@
 import uuid
 import datetime
 from sqlalchemy import Column, String, Float, Integer, Boolean, TIMESTAMP, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy.orm import declarative_base, relationship
 
 # Import GeoAlchemy2 for the Geometry type (PostGIS)
@@ -26,6 +26,10 @@ class Restaurant(Base):
     max_price = Column(Float)
     wheelchair_accessible = Column(Boolean)
     opening_hours = Column(JSONB)
+    google_maps_uri = Column(String(500))
+    types = Column(ARRAY(String))
+    display_name = Column(String(255))
+    primary_type = Column(String(255))
 
 class DiningSession(Base):
     __tablename__ = 'dining_sessions'

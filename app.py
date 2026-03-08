@@ -158,13 +158,8 @@ def create_user_dialog():
                 try:
                     # 1. Postgres User Creation
                     pg_user = pg_crud.create_user(db, name=new_name)
-                    # 2. Neo4j User Node Creation
-                    neo4j_conn.create_user(user_id=str(pg_user.user_id), name=pg_user.name)
-                    
-                    # 3. Add Restrictions to Neo4j
-                    for res in new_restrictions:
-                        neo4j_conn.create_dietary_restriction(name=res)
-                        neo4j_conn.add_user_restriction(user_id=str(pg_user.user_id), restriction_name=res)
+                    # 2. Add Data to Neo4j
+                    neo4j_conn.add_user_to_neo4j(str(pg_user.user_id), pg_user.name, new_restrictions)
                     
                     # Clear any active session results to start fresh
                     st.session_state.current_session_id = None
@@ -342,8 +337,8 @@ with st.expander("2. Configure Session & Individual Preferences", expanded=st.se
             )
             session_uuid = str(pg_session.session_id)
             
-            # 2. Neo4j Create Session Node
-            neo4j_conn.create_session(session_id=session_uuid)
+            # 2. Add Session Data to Neo4j
+            neo4j_conn.add_session_data_to_neo4j(session_uuid, user_data)
 
             # 3. Process every user in the session
             for uid_str, data in user_data.items():
@@ -361,23 +356,6 @@ with st.expander("2. Configure Session & Individual Preferences", expanded=st.se
                     starting_location=start_wkt,
                     max_travel_radius=rad_meters
                 )
-                
-                # B. Neo4j Add Join Edge
-                neo4j_conn.user_join_session(user_id=uid_str, session_id=session_uuid)
-                
-                # C. Neo4j Cuisine Preferences
-                for cuisine_name, score in data['cuisines'].items():
-                    neo4j_conn.create_cuisine(name=cuisine_name)
-                    neo4j_conn.user_desires_cuisine(
-                        user_id=uid_str, 
-                        cuisine_name=cuisine_name, 
-                        session_id=session_uuid, 
-                        score=score
-                    )
-                    neo4j_conn.update_session_cuisine_score(
-                        session_id=session_uuid,
-                        cuisine_name=cuisine_name
-                    )
 
             # Persist the session ID in the Streamlit state
             st.session_state.current_session_id = session_uuid
@@ -394,8 +372,13 @@ if st.session_state.current_session_id:
     try:
         session_uuid = st.session_state.current_session_id
         
+        from utils.filtering import filter_restaurants_by_neo4j, get_filtered_restaurants_for_session
         # Fetch filtered restaurants from Postgres
-        filtered_restaurants = pg_crud.get_filtered_restaurants_for_session(db, session_uuid)
+        pg_filtered = get_filtered_restaurants_for_session(db, session_uuid)
+        
+        # Filter and score with Neo4j
+        scored_restaurants = filter_restaurants_by_neo4j(neo4j_conn, session_uuid, pg_filtered)
+        filtered_restaurants = [item["restaurant"] for item in scored_restaurants]
         
         # Look up restaurant names in Neo4j
         place_ids = [r.place_id for r in filtered_restaurants]

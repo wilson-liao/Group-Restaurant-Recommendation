@@ -44,6 +44,7 @@ def main():
     for i, r in enumerate(restaurants):
         place_id = r.get("id")
         name = r.get("displayName", {}).get("text", "Unknown")
+        primary_type = r.get("primaryType", "Unknown")
         lat = r.get("location", {}).get("latitude")
         lng = r.get("location", {}).get("longitude")
         location_wkt = f"POINT({lng} {lat})" if lat is not None and lng is not None else None
@@ -65,7 +66,7 @@ def main():
         
         opening_hours = r.get("regularOpeningHours", {})
         
-        # 1. PostgreSQL Create
+        # 1. PostgreSQL Create or Update
         existing = pg_crud.get_restaurant(db, place_id)
         if not existing:
             pg_crud.create_restaurant(
@@ -76,7 +77,20 @@ def main():
                 min_price=min_price,
                 max_price=max_price,
                 wheelchair_accessible=wheelchair_accessible,
-                opening_hours=opening_hours
+                opening_hours=opening_hours,
+                google_maps_uri=r.get("googleMapsUri"),
+                types=r.get("types", []),
+                display_name=name,
+                primary_type=primary_type
+            )
+        else:
+            pg_crud.update_restaurant(
+                db=db,
+                place_id=place_id,
+                google_maps_uri=r.get("googleMapsUri"),
+                types=r.get("types", []),
+                display_name=name,
+                primary_type=primary_type
             )
             
         # 2. Neo4j Create

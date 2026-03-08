@@ -132,6 +132,39 @@ class Neo4jConnector:
         """
         return self._execute_write(query, session_id=session_id, cuisine_name=cuisine_name)
     
+    def add_user_to_neo4j(self, user_id: str, name: str, restrictions: list):
+        """
+        Inserts a new user and their dietary restrictions into Neo4j.
+        """
+        self.create_user(user_id=user_id, name=name)
+        for res in restrictions:
+            self.create_dietary_restriction(name=res)
+            self.add_user_restriction(user_id=user_id, restriction_name=res)
+
+    def add_session_data_to_neo4j(self, session_id: str, user_data: dict):
+        """
+        Inserts session relationships for users mapping to the session and their desired cuisines.
+        user_data format: { "user_id": { "cuisines": {"Italian": 10, "Mexican": 5} } }
+        """
+        self.create_session(session_id=session_id)
+        
+        for uid_str, data in user_data.items():
+            self.user_join_session(user_id=uid_str, session_id=session_id)
+            
+            if 'cuisines' in data:
+                for cuisine_name, score in data['cuisines'].items():
+                    self.create_cuisine(name=cuisine_name)
+                    self.user_desires_cuisine(
+                        user_id=uid_str, 
+                        cuisine_name=cuisine_name, 
+                        session_id=session_id, 
+                        score=score
+                    )
+                    self.update_session_cuisine_score(
+                        session_id=session_id,
+                        cuisine_name=cuisine_name
+                    )
+
     # --- SOME USEFUL QUERIES ---
     def get_restaurants_accommodating_session(self, session_id: str):
         """
