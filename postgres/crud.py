@@ -127,6 +127,11 @@ def delete_dining_session(db: Session, session_id):
         return True
     return False
 
+def delete_all_sessions(db: Session):
+    db.query(DiningSession).delete()
+    db.commit()
+    return True
+
 # --- SESSION MEMBER CRUD ---
 
 def add_session_member(db: Session, session_id, user_id, starting_location: str, max_travel_radius: int = None):

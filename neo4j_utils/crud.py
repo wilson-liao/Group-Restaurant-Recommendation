@@ -165,6 +165,16 @@ class Neo4jConnector:
                         cuisine_name=cuisine_name
                     )
 
+    def delete_all_sessions(self):
+        """
+        Deletes all Session nodes and their connected relationships from Neo4j.
+        """
+        query = """
+        MATCH (s:Session)
+        DETACH DELETE s
+        """
+        return self._execute_write(query)
+
     # --- SOME USEFUL QUERIES ---
     def get_restaurants_accommodating_session(self, session_id: str):
         """

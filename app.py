@@ -145,6 +145,32 @@ def format_opening_hours(periods):
             
     return formatted_hours
 
+@st.dialog("⚠️ Delete All Sessions")
+def delete_all_sessions_dialog():
+    st.warning("This will permanently delete all dining sessions from the database.")
+    admin_password = os.getenv("ADMIN_PASSWORD", "")
+    
+    with st.form("delete_sessions_form"):
+        pwd_input = st.text_input("Admin Password", type="password")
+        if st.form_submit_button("Delete All"):
+            if pwd_input == admin_password:
+                try:
+                    # 1. Delete from Postgres
+                    pg_crud.delete_all_sessions(db)
+                    
+                    # 2. Delete from Neo4j
+                    neo4j_conn.delete_all_sessions()
+                    
+                    st.session_state.current_session_id = None
+                    st.session_state.selected_restaurant_id = None
+                    st.session_state.config_expanded = True
+                    st.success("All sessions deleted successfully.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error deleting sessions: {e}")
+            else:
+                st.error("Invalid password")
+
 @st.dialog("👤 Create New User")
 def create_user_dialog():
     st.write("Add someone new to the database.")
@@ -174,7 +200,7 @@ def create_user_dialog():
                 st.warning("Name is required.")
 
 # --- UI COMPONENTS ---
-header_col1, header_col2 = st.columns([3, 1])
+header_col1, header_col2, header_col3 = st.columns([2.5, 1, 1])
 with header_col1:
     st.title("🍽️ Start a Dining Session")
     st.markdown("<p style='color: #718096; font-size: 1.1rem; margin-bottom: 2rem;'>Configure your group and instantly synchronize everyone's preferences.</p>", unsafe_allow_html=True)
@@ -182,6 +208,10 @@ with header_col2:
     st.write("") # vertical spacing padding
     if st.button("➕ Create New User", use_container_width=True):
         create_user_dialog()
+with header_col3:
+    st.write("")
+    if st.button("🗑️ Delete All Sessions", use_container_width=True, type="secondary"):
+        delete_all_sessions_dialog()
 
 # --- MAIN BODY: SESSION CONFIGURATION ---
 st.subheader("1. Select Your Group")
@@ -409,6 +439,9 @@ if st.session_state.current_session_id:
                         with st.expander(f"🍽️ {r_name} (⭐️ {r.rating})"):
                             st.markdown(f"<div class='price-badge'>💵 ${r.min_price:,.2f} - ${r.max_price:,.2f}</div>", unsafe_allow_html=True)
                             st.write(f"**Wheelchair Accessible:** {'Yes' if r.wheelchair_accessible else 'No'}")
+                            
+                            if r.google_maps_uri:
+                                st.markdown(f"[📍 Open in Google Maps]({r.google_maps_uri})")
                             
                             if r.opening_hours and "periods" in r.opening_hours:
                                 st.write("**Opening Hours:**")
