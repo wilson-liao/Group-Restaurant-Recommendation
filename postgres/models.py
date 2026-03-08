@@ -22,7 +22,8 @@ class Restaurant(Base):
     place_id = Column(String(255), primary_key=True)
     location = Column(Geometry('POINT', srid=4326))
     rating = Column(Float)
-    price_level = Column(Integer)
+    min_price = Column(Float)
+    max_price = Column(Float)
     wheelchair_accessible = Column(Boolean)
     opening_hours = Column(JSONB)
 
