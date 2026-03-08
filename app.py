@@ -1,157 +1,6 @@
 import streamlit as st
 import uuid
 import urllib.parse
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-# Import CRUD and Models
-from postgres.models import Base
-import postgres.crud as pg_crud
-from neo4j_utils.crud import Neo4jConnector
-
-# --- PAGE CONFIGURATION ---
-st.set_page_config(
-    page_title="ForkSync | Restaurant Recommendations",
-    page_icon="🍽️",
-    layout="centered",
-    initial_sidebar_state="expanded"
-)
-
-# --- CSS STYLING ---
-st.markdown("""
-<style>
-    /* Main Background & Text Colors */
-    .stApp {
-        background-color: #f7f9fc;
-        color: #1a202c;
-    }
-    
-    /* Headers & Typography */
-    h1, h2, h3 {
-        font-family: 'Inter', sans-serif;
-        color: #2d3748;
-        font-weight: 700;
-    }
-    
-    /* Input Fields */
-    .stTextInput>div>div>input {
-        border-radius: 8px;
-        border: 1px solid #e2e8f0;
-        padding: 10px 14px;
-        transition: all 0.2s ease;
-    }
-    .stTextInput>div>div>input:focus {
-        border-color: #3182ce;
-        box-shadow: 0 0 0 1px #3182ce;
-    }
-    
-    /* Buttons */
-    .stButton>button {
-        background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 24px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-        transition: all 0.3s ease;
-        width: 100%;
-    }
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
-        color: white;
-    }
-    
-    /* Tabs styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 20px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        white-space: pre-wrap;
-        background-color: transparent;
-        border-radius: 6px 6px 0px 0px;
-        gap: 1px;
-        padding-top: 10px;
-        padding-bottom: 10px;
-    }
-    .stTabs [aria-selected="true"] {
-        color: #3182ce;
-        border-bottom: 2px solid #3182ce;
-        font-weight: bold;
-    }
-    
-    /* Cards for grouping content */
-    .card {
-        background: white;
-        padding: 24px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-        margin-bottom: 24px;
-        border: 1px solid #edf2f7;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# --- DATABASE CONNECTION LOGIC ---
-@st.cache_resource
-def get_db_connections():
-    """Initializes and caches database connections."""
-    import os
-    from dotenv import load_dotenv
-    
-    # Load environment variables from .env file
-    load_dotenv()
-    
-    try:
-        # Postgres Config
-        PG_USER = os.getenv("PG_USER", "postgres")
-        PG_PASSWORD = os.getenv("PG_PASSWORD", "password")
-        PG_HOST = os.getenv("PG_HOST", "localhost")
-        PG_PORT = os.getenv("PG_PORT", "5432")
-        PG_DB = os.getenv("PG_DB", "postgres")
-        
-        # Neo4j Config
-        NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-        NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-        NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
-
-        encoded_pwd = urllib.parse.quote_plus(PG_PASSWORD)
-        DATABASE_URL = f"postgresql://{PG_USER}:{encoded_pwd}@{PG_HOST}:{PG_PORT}/{PG_DB}"
-        engine = create_engine(DATABASE_URL)
-        Base.metadata.create_all(bind=engine) # Initialize tables if they don't exist
-        
-        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        neo4j_conn = Neo4jConnector(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
-        
-        return SessionLocal, neo4j_conn
-    except Exception as e:
-        st.error(f"Failed to connect to databases. Please verify your credentials and ensure the servers are running.\n\n{e}")
-        return None, None
-
-SessionLocal, neo4j_conn = get_db_connections()
-
-# --- HELPER FUNCTION FOR DB SESSION ---
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# Validate UUIDs
-def is_valid_uuid(val):
-    try:
-        uuid.UUID(str(val))
-        return True
-    except ValueError:
-        return False
-
-# --- UI COMPONENTS ---
-import streamlit as st
-import uuid
-import urllib.parse
 import os
 from datetime import datetime, time
 from dotenv import load_dotenv
@@ -176,10 +25,8 @@ st.markdown("""
 <style>
     .stApp { background-color: #f7f9fc; color: #1a202c; }
     h1, h2, h3 { font-family: 'Inter', sans-serif; color: #2d3748; font-weight: 700; }
-    .card { background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); margin-bottom: 24px; border: 1px solid #edf2f7; }
     .user-card { background: #f8fafc; padding: 16px; border-radius: 8px; border-left: 4px solid #3182ce; margin-bottom: 16px; }
     hr { margin-top: 1rem; margin-bottom: 1rem; border: 0; border-top: 1px solid #e2e8f0; }
-    div[data-testid="stExpander"] { background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -246,7 +93,6 @@ col_main, col_sidebar = st.columns([2, 1])
 
 # --- SIDEBAR: CREATE NEW USER ---
 with col_sidebar:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.subheader("👤 Create New User")
     st.write("Add someone new to the database.")
     
@@ -273,12 +119,9 @@ with col_sidebar:
                     st.error(f"Error creating user: {e}")
             else:
                 st.warning("Name is required.")
-    st.markdown("</div>", unsafe_allow_html=True)
-
 
 # --- MAIN BODY: SESSION CONFIGURATION ---
 with col_main:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.subheader("1. Select Your Group")
     
     # User Selector
@@ -294,12 +137,9 @@ with col_main:
     if not selected_ids:
         st.info("👈 Select users from the dropdown or create a new user to begin configuring the session.")
         st.stop()
-
-    st.markdown("</div>", unsafe_allow_html=True)
     
     # Form wrapper for all dynamic inputs
     with st.form("session_creation_form"):
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
         st.subheader("2. Session Details")
         col_s1, col_s2 = st.columns(2)
         with col_s1:
@@ -307,7 +147,6 @@ with col_main:
             wheelchair_needed = st.checkbox("Requires Wheelchair Accessible Venue")
         with col_s2:
             max_group_price = st.number_input("Max Price ($ USD) for Group", min_value=1, value=50, step=5)
-        st.markdown("</div>", unsafe_allow_html=True)
 
         st.subheader("3. Individual Preferences")
         user_data = {} # Store dynamically collected data here
