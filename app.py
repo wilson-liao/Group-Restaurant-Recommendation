@@ -353,6 +353,7 @@ with st.expander("2. Configure Session & Individual Preferences", expanded=st.se
             
             # We need a central target_location. For this logic, we'll arbitrarily use the creator's location
             # Ideally the matching algo calculates the centroid later, but the schema requires target_location on creation.
+            # TODO - Implement location intersection
             c_data = user_data[selected_ids[0]]
             t_loc_wkt = f"POINT({c_data['lng']} {c_data['lat']})"
 

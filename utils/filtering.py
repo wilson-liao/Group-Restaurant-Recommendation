@@ -80,6 +80,10 @@ def get_filtered_restaurants_for_session(db: Session, session_id):
     else:
         valid_restaurants = restaurants
 
+
+    # print(f'length of filtered restaurants: {len(valid_restaurants)}')
+    # for r in valid_restaurants:
+    #     print(r.display_name)
     return valid_restaurants
 
 def filter_restaurants_by_neo4j(neo4j_conn, session_id: str, valid_restaurants: list):
@@ -133,5 +137,8 @@ def filter_restaurants_by_neo4j(neo4j_conn, session_id: str, valid_restaurants: 
             
     # Sort by score descending
     filtered_and_scored.sort(key=lambda x: x["score"], reverse=True)
+
+    # print(f'neo4j restaurants legnth: {len(filtered_and_scored)}')
+    # print(f'neo4j restaurants: {filtered_and_scored}')
     return filtered_and_scored
 
