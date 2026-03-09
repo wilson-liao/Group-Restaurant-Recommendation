@@ -4,11 +4,7 @@ import re
 DIETARY_KEYWORDS = {
     "Vegan": ["vegan", "100% plant-based", "strictly plant-based"],
     "Vegetarian": ["vegetarian", "veg", "plant-based", "meatless"],
-    "Gluten-Free": ["gluten-free", "gf", "celiac", "gluten free"],
-    "Dairy-Free": ["dairy-free", "lactose-free", "dairy free", "non-dairy"],
-    "Nut Allergy": ["nut-free", "peanut-free", "allergy-friendly", "nut free"],
     "Halal": ["halal", "zabihah"],
-    "Kosher": ["kosher", "glatt"],
     "Pescatarian": ["pescatarian", "seafood", "fish", "sushi", "poke"]
 }
 

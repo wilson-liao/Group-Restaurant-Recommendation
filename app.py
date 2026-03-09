@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from postgres.models import Base
 import postgres.crud as pg_crud
 from neo4j_utils.crud import Neo4jConnector
+from utils.dietary_classifier import DIETARY_KEYWORDS
 
 import folium
 from streamlit_folium import st_folium
@@ -78,7 +79,7 @@ db = next(get_db())
 
 # --- CONSTANTS ---
 CUISINE_OPTIONS = ["Italian", "Mexican", "Thai", "Japanese", "Chinese", "American", "Indian", "Mediterranean", "Korean", "French", "Vietnamese", "Greek", "Vegan/Healthy"]
-RESTRICTION_OPTIONS = ["Vegan", "Vegetarian", "Gluten-Free", "Dairy-Free", "Nut Allergy", "Halal", "Kosher", "Pescatarian"]
+RESTRICTION_OPTIONS = list(DIETARY_KEYWORDS.keys())
 
 # --- STATE MANAGEMENT ---
 if 'selected_users' not in st.session_state:
