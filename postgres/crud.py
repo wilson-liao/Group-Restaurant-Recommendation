@@ -93,11 +93,9 @@ def delete_restaurant(db: Session, place_id: str):
 
 # --- DINING SESSION CRUD ---
 
-def create_dining_session(db: Session, creator_id, target_location: str, max_price_level: int = None, target_dining_time = None, requires_wheelchair: bool = None):
-    # target_location should be a WKT string 'POINT(long lat)'
+def create_dining_session(db: Session, creator_id, max_price_level: int = None, target_dining_time = None, requires_wheelchair: bool = None):
     session = DiningSession(
         creator_id=creator_id,
-        target_location=target_location,
         max_price_level=max_price_level,
         target_dining_time=target_dining_time,
         requires_wheelchair=requires_wheelchair

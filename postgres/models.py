@@ -36,7 +36,6 @@ class DiningSession(Base):
     
     session_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     creator_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'))
-    target_location = Column(Geometry('POINT', srid=4326))
     max_price_level = Column(Integer)
     target_dining_time = Column(TIMESTAMP)
     requires_wheelchair = Column(Boolean)

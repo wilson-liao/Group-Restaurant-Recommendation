@@ -20,7 +20,7 @@ CREATE TABLE restaurants (
 CREATE TABLE dining_sessions (
     session_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     creator_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
-    target_location GEOMETRY(Point, 4326),
+
     max_price_level INT,
     target_dining_time TIMESTAMP,
     requires_wheelchair BOOLEAN

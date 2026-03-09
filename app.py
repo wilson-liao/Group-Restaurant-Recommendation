@@ -351,17 +351,10 @@ with st.expander("2. Configure Session & Individual Preferences", expanded=st.se
             # Combine selected date with target_time to create a timestamp
             dt_target = datetime.combine(target_date, target_time)
             
-            # We need a central target_location. For this logic, we'll arbitrarily use the creator's location
-            # Ideally the matching algo calculates the centroid later, but the schema requires target_location on creation.
-            # TODO - Implement location intersection
-            c_data = user_data[selected_ids[0]]
-            t_loc_wkt = f"POINT({c_data['lng']} {c_data['lat']})"
-
             # 1. Postgres Create Session
             pg_session = pg_crud.create_dining_session(
                 db, 
                 creator_id=creator_id,
-                target_location=t_loc_wkt,
                 max_price_level=max_group_price,  # NOTE: the schema field is actually max_price_level so we are still passing it effectively as max_price
                 target_dining_time=dt_target,
                 requires_wheelchair=wheelchair_needed
@@ -417,13 +410,18 @@ if st.session_state.current_session_id:
         name_records = neo4j_conn._execute_read(query, place_ids=place_ids)
         name_map = {rec["place_id"]: rec["name"] for rec in name_records}
         
-        # Fetch session members to get their start locations
+        # Fetch session members to get their start locations and radiuses
         session_members = pg_crud.get_session_members(db, session_uuid)
         member_locations = []
         for m in session_members:
             geom = to_shape(m.starting_location)
             uname = all_users_dict[str(m.user_id)]
-            member_locations.append({"name": uname, "lat": geom.y, "lng": geom.x})
+            member_locations.append({
+                "name": uname, 
+                "lat": geom.y, 
+                "lng": geom.x, 
+                "radius": m.max_travel_radius
+            })
 
         st.markdown("---")
         st.subheader(f"Found {len(filtered_restaurants)} restaurants matching group criteria:")
@@ -477,14 +475,26 @@ if st.session_state.current_session_id:
                 # Initialize Unified Map
                 m_unified = folium.Map(location=[map_lat, map_lng], zoom_start=12 if selected_r else 11)
                 
-                # Pin all users
+                # Pin all users and draw their travel radiuses
                 for loc in member_locations:
+                    # User pin
                     folium.Marker(
                         [loc["lat"], loc["lng"]],
                         popup=f"User: {loc['name']}",
                         tooltip=loc["name"],
                         icon=folium.Icon(color="blue", icon="user")
                     ).add_to(m_unified)
+                    
+                    # User max travel radius circle
+                    if loc.get("radius"):
+                        folium.Circle(
+                            location=[loc["lat"], loc["lng"]],
+                            radius=loc["radius"],
+                            color="blue",
+                            weight=1,
+                            fill=True,
+                            fill_opacity=0.1
+                        ).add_to(m_unified)
                     
                 # Pin the selected restaurant (if any)
                 if selected_r:
