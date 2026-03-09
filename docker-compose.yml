@@ -37,6 +37,10 @@ services:
     build: .
     container_name: forksync_data_loader
     env_file: .env
+    environment:
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - NEO4J_URI=bolt://neo4j:7687
     depends_on:
       postgres:
         condition: service_started
@@ -47,9 +51,9 @@ services:
       echo 'Waiting for databases to initialize...' &&
       sleep 20 &&
       echo 'Running PostgreSQL Data Loader (seed_db.py)...' &&
-      python utils/seed_db.py &&
+      python -m utils.seed_db &&
       echo 'Running Neo4j Sync (sync_to_neo4j.py)...' &&
-      python utils/sync_to_neo4j.py &&
+      python -m utils.sync_to_neo4j &&
       echo 'Initialization Complete!'
       "
 
