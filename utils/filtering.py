@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from geoalchemy2.types import Geography
 from postgres.models import Restaurant, SessionMember
 from postgres.crud import get_dining_session
@@ -19,7 +19,7 @@ def get_filtered_restaurants_for_session(db: Session, session_id):
     # 2. Filter by Price Range
     # Assume session.max_price_level holds the group's max price
     if session.max_price_level is not None:
-        query = query.filter(session.max_price_level >= Restaurant.max_price)
+        query = query.filter(or_(Restaurant.max_price == None, session.max_price_level >= Restaurant.max_price))
 
     # 3. Filter by Location Radius
     members = db.query(SessionMember).filter(SessionMember.session_id == session_id).all()

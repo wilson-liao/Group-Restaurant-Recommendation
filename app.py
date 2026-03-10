@@ -54,7 +54,7 @@ def get_db_connections():
 
         encoded_pwd = urllib.parse.quote_plus(PG_PASSWORD)
         DATABASE_URL = f"postgresql://{PG_USER}:{encoded_pwd}@{PG_HOST}:{PG_PORT}/{PG_DB}"
-        engine = create_engine(DATABASE_URL)
+        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
         Base.metadata.create_all(bind=engine)
         
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -240,7 +240,7 @@ with st.expander("2. Configure Session & Individual Preferences", expanded=st.se
         target_time = st.time_input("Target Dining Time", value=time(19, 0))
         wheelchair_needed = st.checkbox("Requires Wheelchair Accessible Venue")
     with col_s2:
-        max_group_price = st.number_input("Max Price ($ USD) for Group", min_value=1, value=50, step=5)
+        max_group_price = st.number_input("Max Price ($ USD) for Group (Optional)", min_value=1, value=None, step=5, placeholder="Unlimited")
 
     st.subheader("3. Individual Preferences")
     user_data = {} # Store dynamically collected data here
@@ -319,7 +319,7 @@ with st.expander("2. Configure Session & Individual Preferences", expanded=st.se
             final_lng = st.number_input(f"Selected Longitude", value=lng, format="%.6f", key=f"lng_final_{uid}")
 
         with c2:
-            radius = st.number_input(f"Max Travel Radius", min_value=1.0, value=5.0, step=1.0, key=f"rad_{uid}")
+            radius = st.number_input(f"Max Travel Radius", min_value=1.0, value=15.0, step=1.0, key=f"rad_{uid}")
             unit = st.selectbox(f"Distance Unit", ["Miles", "Kilometers"], key=f"unit_{uid}")
         
         # Cuisines expander to save vertical space
@@ -403,8 +403,10 @@ if st.session_state.current_session_id:
         pg_filtered = get_filtered_restaurants_for_session(db, session_uuid)
         
         # Filter and score with Neo4j
+        # Filter and score with Neo4j, limiting to top 50
         scored_restaurants = filter_restaurants_by_neo4j(neo4j_conn, session_uuid, pg_filtered)
-        filtered_restaurants = [item["restaurant"] for item in scored_restaurants]
+        top_scored = scored_restaurants[:50]
+        filtered_restaurants = [item["restaurant"] for item in top_scored]
         
         # Look up restaurant names, cuisines, and dietary restrictions in Neo4j
         place_ids = [r.place_id for r in filtered_restaurants]
@@ -431,6 +433,223 @@ if st.session_state.current_session_id:
             })
 
         st.markdown("---")
+        
+        # Display Cuisine Scores
+        cuisine_scores_query = """
+        MATCH (u:User)-[r:DESIRES_CUISINE {session_id: $session_id}]->(c:Cuisine)
+        WHERE r.score > 0
+        WITH c.name AS cuisine, sum(r.score) AS score, collect(u.name + ': ' + toString(r.score)) AS breakdown
+        RETURN cuisine, score, breakdown
+        ORDER BY score DESC
+        """
+        cuisine_scores_records = neo4j_conn._execute_read(cuisine_scores_query, session_id=session_uuid)
+        
+        if cuisine_scores_records:
+            st.subheader("📊 Group Cuisine Preferences")
+            import pandas as pd
+            import altair as alt
+
+            df_scores = pd.DataFrame(cuisine_scores_records)
+            df_scores["score"] = pd.to_numeric(df_scores["score"])
+            # Filter out scores of 0 so they don't visually clutter the pack
+            df_scores = df_scores[df_scores["score"] > 0]
+            
+            if not df_scores.empty:
+                max_score = df_scores["score"].max()
+                
+                import streamlit.components.v1 as components
+                import json
+                
+                colors = ["#FF4B4B", "#10b981", "#8b5cf6", "#f59e0b", "#3b82f6", "#ec4899", "#14b8a6", "#f43f5e", "#84cc16", "#06b6d4"]
+                
+                # Prepare JSON data for D3
+                d3_data = []
+                for i, row in df_scores.iterrows():
+                    d3_data.append({
+                        "id": row['cuisine'], 
+                        "value": row['score'], 
+                        "color": colors[i % len(colors)],
+                        "breakdown": row['breakdown']
+                    })
+                
+                # Dynamically calculate container size based on number of cuisines
+                num_cuisines = len(df_scores)
+                container_size = min(900, max(500, 300 + (num_cuisines * 40)))
+                
+                html_code = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <script src="https://d3js.org/d3.v7.min.js"></script>
+                  <style>
+                    body {{ margin: 0; overflow: hidden; background-color: transparent; font-family: sans-serif; height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }}
+                    #container {{ width: {container_size}px; height: {container_size}px; border-radius: 50%; background-color: #f8fafc; border: 2px dashed #cbd5e1; position: relative; overflow: hidden; box-shadow: inset 0 4px 6px rgba(0,0,0,0.05); flex-shrink: 0; }}
+                    svg {{ width: 100%; height: 100%; }}
+                    .tooltip {{
+                      position: absolute;
+                      text-align: center;
+                      padding: 12px 16px;
+                      font: 14px sans-serif;
+                      font-weight: bold;
+                      background: rgba(15, 23, 42, 0.95);
+                      color: white;
+                      border-radius: 12px;
+                      border: 1px solid rgba(255, 255, 255, 0.1);
+                      backdrop-filter: blur(4px);
+                      pointer-events: none;
+                      opacity: 0;
+                      transition: opacity 0.2s;
+                      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+                      z-index: 10;
+                    }}
+                    .node circle {{ cursor: pointer; transition: stroke-width 0.2s, stroke 0.2s; }}
+                    .node text {{ pointer-events: none; user-select: none; }}
+                  </style>
+                </head>
+                <body>
+                <div id="container">
+                  <svg></svg>
+                </div>
+                <div class="tooltip" id="tooltip"></div>
+                
+                <script>
+                  const data = {json.dumps(d3_data)};
+                
+                  const width = {container_size};
+                  const height = {container_size};
+                  const centerX = width / 2;
+                  const centerY = height / 2;
+                  const radiusBoundary = width / 2 - 5;
+                
+                  const svg = d3.select("svg").attr("viewBox", [0, 0, width, height]);
+                
+                  const maxVal = d3.max(data, d => d.value) || 1;
+                  
+                  // Calculate dynamic optimal radius packing based on number of cuisines
+                  const numNodes = data.length || 1;
+                  const safeArea = Math.PI * Math.pow(radiusBoundary, 2) * 0.45; // Fill ~45% of the circle area
+                  const idealMaxNodeArea = safeArea / numNodes; 
+                  const idealMaxRadius = Math.sqrt(idealMaxNodeArea / Math.PI);
+                  
+                  const minR = Math.max(15, Math.min(35, idealMaxRadius * 0.4));
+                  const maxR = Math.max(30, Math.min(100, idealMaxRadius));
+                  
+                  // Bubbly sizes (dynamic limits with exponential scaling to exaggerate differences)
+                  const sizeScale = d3.scalePow().exponent(1.5).domain([0, maxVal]).range([minR, maxR]);
+                
+                  const simulation = d3.forceSimulation(data)
+                    .force("charge", d3.forceManyBody().strength(15)) // slight push apart
+                    .force("collide", d3.forceCollide().radius(d => sizeScale(d.value) + 2).iterations(4))
+                    .force("center", d3.forceCenter(centerX, centerY).strength(0.05))
+                    .force("x", d3.forceX(centerX).strength(0.04))
+                    .force("y", d3.forceY(centerY).strength(0.04));
+                
+                  const tooltip = d3.select("#tooltip");
+                
+                  const node = svg.append("g")
+                    .selectAll("g")
+                    .data(data)
+                    .join("g")
+                    .attr("class", "node")
+                    .call(d3.drag()
+                        .on("start", dragstarted)
+                        .on("drag", dragged)
+                        .on("end", dragended))
+                    .on("mouseover", function(event, d) {{
+                        d3.select(this).select("circle")
+                           .transition().duration(200)
+                           .attr("r", sizeScale(d.value) * 1.1)
+                           .attr("stroke", "#334155")
+                           .attr("stroke-width", 4);
+                           
+                        let breakdownHtml = d.breakdown.map(b => "<div style='font-size:13px; font-weight:normal; color:#cbd5e1; text-align:left; display:flex; justify-content:space-between; margin-top:2px;'><span>" + b.split(":")[0] + "</span><span style='color:#94a3b8; font-weight:bold;'>" + b.split(":")[1] + "</span></div>").join("");
+                           
+                        tooltip.transition().duration(200).style("opacity", 1);
+                        tooltip.html("<div style='font-size: 16px; font-weight: 800; margin-bottom: 2px;'>" + d.id + "</div><div style='font-size: 14px; font-weight: 500; color: #94a3b8;'>Score: <span style='font-size: 18px; font-weight: 900; color: #38bdf8;'>" + d.value + "</span></div><hr style='border-color: rgba(255,255,255,0.1); margin: 8px 0;'/>" + breakdownHtml)
+                           .style("left", (event.pageX + 25) + "px")
+                           .style("top", (event.pageY - 45) + "px");
+                    }})
+                    .on("mousemove", function(event) {{
+                        tooltip.style("left", (event.pageX + 25) + "px")
+                               .style("top", (event.pageY - 45) + "px");
+                    }})
+                    .on("mouseout", function(event, d) {{
+                        d3.select(this).select("circle")
+                           .transition().duration(200)
+                           .attr("r", sizeScale(d.value))
+                           .attr("stroke", null);
+                           
+                        tooltip.transition().duration(300).style("opacity", 0);
+                    }});
+                
+                  // Draw circles
+                  node.append("circle")
+                    .attr("r", d => sizeScale(d.value))
+                    .attr("fill", d => d.color)
+                    .attr("filter", "drop-shadow(0px 4px 4px rgba(0,0,0,0.15))");
+                
+                  // Draw Cuisine Name
+                  node.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", "-0.2em")
+                    .style("fill", "white")
+                    .style("font-size", d => Math.max(12, sizeScale(d.value)/3.5) + "px")
+                    .style("font-weight", "bold")
+                    .style("text-shadow", "0px 1px 3px rgba(0,0,0,0.5)")
+                    .text(d => d.id);
+                
+                  // Draw Score Number
+                  node.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", "1em")
+                    .style("fill", "white")
+                    .style("font-size", d => Math.max(14, sizeScale(d.value)/2.5) + "px")
+                    .style("font-weight", "900")
+                    .style("text-shadow", "0px 1px 3px rgba(0,0,0,0.5)")
+                    .text(d => d.value);
+                
+                  // Apply physics constraints so they bounce on the circular walls
+                  simulation.on("tick", () => {{
+                    node.attr("transform", d => {{
+                        const r = sizeScale(d.value);
+                        // Current distance from center
+                        const dx = d.x - centerX;
+                        const dy = d.y - centerY;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        
+                        // If bubble pushes outside the transparent circular dashed border
+                        if (dist > radiusBoundary - r) {{
+                            const ratio = (radiusBoundary - r) / dist;
+                            d.x = centerX + dx * ratio;
+                            d.y = centerY + dy * ratio;
+                        }}
+                        return `translate(${{d.x}},${{d.y}})`;
+                    }});
+                  }});
+                
+                  // Dragging physics
+                  function dragstarted(event) {{
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    event.subject.fx = event.subject.x;
+                    event.subject.fy = event.subject.y;
+                  }}
+                  function dragged(event) {{
+                    event.subject.fx = event.x;
+                    event.subject.fy = event.y;
+                  }}
+                  function dragended(event) {{
+                    if (!event.active) simulation.alphaTarget(0);
+                    event.subject.fx = null;
+                    event.subject.fy = null;
+                  }}
+                </script>
+                </body>
+                </html>
+                """
+                components.html(html_code, height=container_size + 40)
+            else:
+                st.info("No cuisine preferences were specified by the group.")
+
         st.subheader(f"Found {len(filtered_restaurants)} restaurants matching group criteria:")
         
         if filtered_restaurants:
@@ -439,14 +658,25 @@ if st.session_state.current_session_id:
             with reg_col:
                 # Wrap the restaurants in a scrollable container
                 with st.container(height=600):
-                    for i, r in enumerate(filtered_restaurants):
+                    for i, item in enumerate(top_scored):
+                        r = item["restaurant"]
+                        r_score = item["score"]
                         r_info = info_map.get(r.place_id, {"name": "Unknown", "cuisines": [], "restrictions": []})
                         r_name = r_info["name"]
                         cuisines = r_info["cuisines"]
                         restrictions = r_info["restrictions"]
                         
-                        with st.expander(f"🍽️ {r_name} (⭐️ {r.rating})"):
-                            st.markdown(f"<div class='price-badge'>💵 ${r.min_price:,.2f} - ${r.max_price:,.2f}</div>", unsafe_allow_html=True)
+                        with st.expander(f"🍽️ {r_name} (⭐️ {r.rating}) — Score: {r_score}"):
+                            if r.min_price is not None and r.max_price is not None:
+                                price_str = f"💵 ${r.min_price:,.2f} - ${r.max_price:,.2f}"
+                            elif r.min_price is not None:
+                                price_str = f"💵 From ${r.min_price:,.2f}"
+                            elif r.max_price is not None:
+                                price_str = f"💵 Up to ${r.max_price:,.2f}"
+                            else:
+                                price_str = "💵 Price Unknown"
+                                
+                            st.markdown(f"<div class='price-badge'>{price_str}</div>", unsafe_allow_html=True)
                             st.write(f"**Wheelchair Accessible:** {'Yes' if r.wheelchair_accessible else 'No'}")
                             
                             col1, col2 = st.columns(2)
@@ -534,7 +764,7 @@ if st.session_state.current_session_id:
                 st_folium(m_unified, width="100%", height=700, key=f"unified_map_{session_uuid}")
                 
                 if selected_r:
-                    st.info(f"Currently viewing: **{name_map.get(selected_r.place_id, 'Unknown')}**")
+                    st.info(f"Currently viewing: **{info_map.get(selected_r.place_id, {}).get('name', 'Unknown')}**")
                 else:
                     st.info("👈 Click **View on Map** in a restaurant's details to see its location.")
                     
