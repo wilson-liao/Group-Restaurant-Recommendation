@@ -12,9 +12,14 @@ CREATE TABLE restaurants (
     place_id VARCHAR(255) PRIMARY KEY,
     location GEOMETRY(Point, 4326),
     rating FLOAT,
-    price_level INT,
+    min_price FLOAT,
+    max_price FLOAT,
     wheelchair_accessible BOOLEAN,
-    opening_hours JSONB
+    opening_hours JSONB,
+    google_maps_uri VARCHAR(500),
+    types TEXT[],
+    display_name VARCHAR(255),
+    primary_type VARCHAR(255)
 );
 
 CREATE TABLE dining_sessions (

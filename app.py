@@ -12,6 +12,7 @@ from postgres.models import Base
 import postgres.crud as pg_crud
 from neo4j_utils.crud import Neo4jConnector
 from utils.dietary_classifier import DIETARY_KEYWORDS
+from utils.cuisine_classifier import CUISINE_KEYWORDS
 
 import folium
 from streamlit_folium import st_folium
@@ -78,7 +79,7 @@ if not SessionLocal or not neo4j_conn:
 db = next(get_db())
 
 # --- CONSTANTS ---
-CUISINE_OPTIONS = ["Italian", "Mexican", "Thai", "Japanese", "Chinese", "American", "Indian", "Mediterranean", "Korean", "French", "Vietnamese", "Greek", "Vegan/Healthy"]
+CUISINE_OPTIONS = list(CUISINE_KEYWORDS.keys())
 RESTRICTION_OPTIONS = list(DIETARY_KEYWORDS.keys())
 
 # --- STATE MANAGEMENT ---
@@ -405,11 +406,16 @@ if st.session_state.current_session_id:
         scored_restaurants = filter_restaurants_by_neo4j(neo4j_conn, session_uuid, pg_filtered)
         filtered_restaurants = [item["restaurant"] for item in scored_restaurants]
         
-        # Look up restaurant names in Neo4j
+        # Look up restaurant names, cuisines, and dietary restrictions in Neo4j
         place_ids = [r.place_id for r in filtered_restaurants]
-        query = "MATCH (r:Restaurant) WHERE r.place_id IN $place_ids RETURN r.place_id AS place_id, r.name AS name"
-        name_records = neo4j_conn._execute_read(query, place_ids=place_ids)
-        name_map = {rec["place_id"]: rec["name"] for rec in name_records}
+        query = """
+        MATCH (r:Restaurant) WHERE r.place_id IN $place_ids 
+        OPTIONAL MATCH (r)-[:SERVES]->(c:Cuisine)
+        OPTIONAL MATCH (r)-[:ACCOMMODATES]->(d:DietaryRestriction)
+        RETURN r.place_id AS place_id, r.name AS name, collect(DISTINCT c.name) AS cuisines, collect(DISTINCT d.name) AS restrictions
+        """
+        neo_records = neo4j_conn._execute_read(query, place_ids=place_ids)
+        info_map = {rec["place_id"]: {"name": rec["name"], "cuisines": rec["cuisines"], "restrictions": rec["restrictions"]} for rec in neo_records}
         
         # Fetch session members to get their start locations and radiuses
         session_members = pg_crud.get_session_members(db, session_uuid)
@@ -434,11 +440,27 @@ if st.session_state.current_session_id:
                 # Wrap the restaurants in a scrollable container
                 with st.container(height=600):
                     for i, r in enumerate(filtered_restaurants):
-                        r_name = name_map.get(r.place_id, "Unknown Restaurant")
+                        r_info = info_map.get(r.place_id, {"name": "Unknown", "cuisines": [], "restrictions": []})
+                        r_name = r_info["name"]
+                        cuisines = r_info["cuisines"]
+                        restrictions = r_info["restrictions"]
                         
                         with st.expander(f"🍽️ {r_name} (⭐️ {r.rating})"):
                             st.markdown(f"<div class='price-badge'>💵 ${r.min_price:,.2f} - ${r.max_price:,.2f}</div>", unsafe_allow_html=True)
                             st.write(f"**Wheelchair Accessible:** {'Yes' if r.wheelchair_accessible else 'No'}")
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                if r.types:
+                                    # Show up to 3 types, neatly formatted
+                                    formatted_types = [t.replace('_', ' ').title() for t in r.types[:3]]
+                                    st.write(f"**Types:** {', '.join(formatted_types)}")
+                                if cuisines:
+                                    st.write(f"**Cuisine:** {', '.join(cuisines)}")
+                            with col2:
+                                if restrictions:
+                                    st.write(f"**Dietary:** {', '.join(restrictions)}")
+                            
                             
                             if r.google_maps_uri:
                                 st.markdown(f"[📍 Open in Google Maps]({r.google_maps_uri})")
@@ -499,7 +521,8 @@ if st.session_state.current_session_id:
                     
                 # Pin the selected restaurant (if any)
                 if selected_r:
-                    r_name = name_map.get(selected_r.place_id, "Selected Restaurant")
+                    r_info = info_map.get(selected_r.place_id, {"name": "Unknown"})
+                    r_name = r_info.get("name", "Selected Restaurant")
                     r_geom = to_shape(selected_r.location)
                     folium.Marker(
                         [r_geom.y, r_geom.x], 

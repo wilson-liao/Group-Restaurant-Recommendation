@@ -2,24 +2,26 @@ import re
 
 # A static dictionary you maintain in your backend
 CUISINE_KEYWORDS = {
-    "Mexican": ["mexican", "taco", "burrito", "al pastor", "salsa", "taqueria", "cantina", "mariscos"],
+    "Mexican": ["mexican", "taco", "burrito", "al pastor", "salsa", "taqueria", "cantina", "mariscos", "tex mex", "southwestern us", "latin american"],
     "Italian": ["italian", "pasta", "pizza", "napoletana", "trattoria", "pizzeria"],
-    "Japanese": ["japanese", "sushi", "ramen", "izakaya", "udon", "teppanyaki", "katsu", "teriyaki"],
-    "Thai": ["thai", "pad thai", "curry"],
-    "American": ["american", "burger", "hamburger", "steak", "steakhouse", "barbecue", "bbq", "diner", "grill"],
-    "Chinese": ["chinese", "dim sum", "dumpling", "noodle", "sichuan", "cantonese"],
-    "Korean": ["korean", "kbbq", "bulgogi", "kimchi", "tofu", "bibimbap"],
+    "Japanese": ["japanese", "sushi", "ramen", "izakaya", "udon", "teppanyaki", "katsu", "teriyaki", "yakitori", "japanese curry"],
+    "Thai": ["thai", "pad thai", "thai curry"],
+    "American": ["american", "burger", "hamburger", "steak", "steakhouse", "barbecue", "bbq", "hot dog", "chicken wings", "soul food", "cajun"],
+    "Taiwanese": ["taiwanese", "boba"],
+    "Chinese": ["chinese", "dim sum", "dumpling", "sichuan", "cantonese", "hot pot", "chinese noodle", "asian fusion"],
+    "Korean": ["korean", "kbbq", "bulgogi", "kimchi", "bibimbap", "korean barbecue"],
     "Vietnamese": ["vietnamese", "pho", "banh mi"],
-    "Asian": ["asian", "pan-asian"],  # Generic fallback for asian
-    "Mediterranean": ["mediterranean", "greek", "falafel", "gyro", "kebab", "shawarma", "lebanese"],
-    "Indian": ["indian", "curry", "tikka", "masala"],
-    "French": ["french", "crepe", "bistro", "brasserie"],
-    "Seafood": ["seafood", "fish", "oyster", "crab", "poke", "shrimp", "lobster"],
-    "Vegetarian / Vegan": ["vegetarian", "vegan", "plant based"],
+    "Asian": ["asian", "pan-asian", "burmese", "filipino"],
+    "Mediterranean": ["mediterranean", "greek", "falafel", "gyro", "kebab", "shawarma", "lebanese", "turkish", "middle eastern", "persian", "afghani"],
+    "Indian": ["indian", "indian curry", "tikka", "masala", "north indian", "south indian", "pakistani", "tibetan"],
+    "French": ["french", "crepe", "brasserie"],
+    "Seafood": ["seafood", "fish", "oyster", "crab", "poke", "shrimp", "lobster", "fish and chips", "salmon"],
+    "European": ["spanish", "tapas", "british", "irish", "german", "danish", "scandinavian", "hungarian"],
+    "Other / Global": ["cuban", "caribbean", "colombian", "south american", "argentinian", "peruvian", "brazilian", "african", "ethiopian", "australian"],
     "Cafe / Bakery": ["cafe", "bakery", "coffee", "dessert", "pastry", "donut", "ice cream", "gelato"],
-    "Breakfast / Brunch": ["breakfast", "brunch", "pancake", "waffle"],
     "Bar / Pub / Brewery": ["bar", "pub", "brewery", "cocktail", "tavern", "wine", "distillery"],
-    "Hawaiian": ["hawaiian", "poke", "luau"]
+    "Hawaiian": ["hawaiian", "poke", "luau"],
+    "Fast Food / Casual": ["fast food"]
 }
 
 def get_cuisines_for_restaurant(display_name: str, types: list) -> list:
@@ -67,3 +69,32 @@ def get_cuisines_for_restaurant(display_name: str, types: list) -> list:
         matched_cuisines.add("Others")
         
     return sorted(list(matched_cuisines))
+
+if __name__ == '__main__':
+    import json
+    with open("sd_restaurants.json", "r", encoding="utf-8") as f:
+        restaurants = json.load(f)
+        
+    print(f"Found {len(restaurants)} restaurants. Beginning seed process...")
+
+    types = [
+      "taiwanese_restaurant",
+      "dumpling_restaurant",
+      "chinese_restaurant",
+      "restaurant",
+      "food",
+      "point_of_interest",
+      "establishment"
+    ]
+    name = 'Din Tai Fung'
+    cuisines = get_cuisines_for_restaurant(name, types)
+    print(f'name: {name}, types: {types}, cuisines: {cuisines}', end = '\n\n')
+
+    # for i, r in enumerate(restaurants):
+    #     if i > 20:
+    #         break
+    #     name = r.get("displayName", {}).get("text", "Unknown")
+    #     types = r.get("types", [])        
+    
+    #     cuisines = get_cuisines_for_restaurant(name, types)
+    #     print(f'name: {name}, types: {types}, cuisines: {cuisines}', end = '\n\n')

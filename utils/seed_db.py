@@ -7,7 +7,6 @@ from sqlalchemy.orm import sessionmaker
 
 from postgres.models import Base
 import postgres.crud as pg_crud
-from neo4j_utils.crud import Neo4jConnector
 
 def main():
     print("Loading environment variables...")
@@ -19,19 +18,12 @@ def main():
     PG_PORT = os.getenv("PG_PORT", "5432")
     PG_DB = os.getenv("PG_DB", "postgres")
 
-    NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-    NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-    NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
-
     print("Connecting to PostgreSQL...")
     encoded_pwd = urllib.parse.quote_plus(PG_PASSWORD)
     DATABASE_URL = f"postgresql://{PG_USER}:{encoded_pwd}@{PG_HOST}:{PG_PORT}/{PG_DB}"
     engine = create_engine(DATABASE_URL)
     Base.metadata.create_all(bind=engine)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    
-    print("Connecting to Neo4j...")
-    neo4j_conn = Neo4jConnector(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
     
     db = SessionLocal()
     
@@ -94,28 +86,13 @@ def main():
             )
             
         # 2. Neo4j Create
-        neo4j_conn.create_restaurant(place_id=place_id, name=name)
+        # (Removed: Neo4j syncing is exclusively handled by sync_to_neo4j.py)
         
-        # 3. Create Cuisines in Neo4j based on types
-        types = r.get("types", [])
-        for t in types:
-            if t.endswith("_restaurant"):
-                cuisine = t.replace("_restaurant", "").replace("_", " ").title()
-                neo4j_conn.create_cuisine(name=cuisine)
-                neo4j_conn.add_restaurant_cuisine(place_id=place_id, cuisine_name=cuisine)
-                
-            # Extra mapping for generic terms or drinks
-            elif t in ["cafe", "bakery", "bar", "brewery", "steakhouse"]:
-                cuisine = t.replace("_", " ").title()
-                neo4j_conn.create_cuisine(name=cuisine)
-                neo4j_conn.add_restaurant_cuisine(place_id=place_id, cuisine_name=cuisine)
-
         if (i + 1) % 100 == 0:
             print(f"Processed {i + 1} / {len(restaurants)} restaurants.")
 
     print(f"Finished processing all {len(restaurants)} restaurants.")
     db.close()
-    neo4j_conn.close()
 
 if __name__ == "__main__":
     main()
