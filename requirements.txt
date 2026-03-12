@@ -4,3 +4,7 @@ psycopg2-binary
 geoalchemy2
 neo4j
 python-dotenv
+folium
+streamlit-folium
+geopy
+geoalchemy2[shapely]
