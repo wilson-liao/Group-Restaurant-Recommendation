@@ -16,7 +16,7 @@ CUISINE_KEYWORDS = {
     "Indian": ["indian", "indian curry", "tikka", "masala", "north indian", "south indian", "pakistani", "tibetan"],
     "French": ["french", "crepe", "brasserie"],
     "Seafood": ["seafood", "fish", "oyster", "crab", "poke", "shrimp", "lobster", "fish and chips", "salmon"],
-    "European": ["spanish", "tapas", "british", "irish", "german", "danish", "scandinavian", "hungarian"],
+    "European": ["spanish", "british", "irish", "german", "danish", "scandinavian", "hungarian"],
     "Other / Global": ["cuban", "caribbean", "colombian", "south american", "argentinian", "peruvian", "brazilian", "african", "ethiopian", "australian"],
     "Cafe / Bakery": ["cafe", "bakery", "coffee", "dessert", "pastry", "donut", "ice cream", "gelato"],
     "Bar / Pub / Brewery": ["bar", "pub", "brewery", "cocktail", "tavern", "wine", "distillery"],
