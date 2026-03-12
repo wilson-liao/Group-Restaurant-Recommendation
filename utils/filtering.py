@@ -110,13 +110,12 @@ def filter_restaurants_by_neo4j(neo4j_conn, session_id: str, valid_restaurants: 
     MATCH (r:Restaurant)
     WHERE r.place_id IN $place_ids
     // If a user has restrictions, the restaurant MUST accommodate them.
-    // The previous all() logic threw exception if list contained nulls, so handle it:
     WITH s, r, [res in session_restrictions WHERE res IS NOT NULL] as valid_restrictions
     WHERE all(restriction in valid_restrictions WHERE (r)-[:ACCOMMODATES]->(restriction))
     
-    // Optional: get cuisine score
-    OPTIONAL MATCH (s)-[sc:DESIRES_CUISINE]->(c:Cuisine)<-[:SERVES]-(r)
-    WITH r, coalesce(sum(sc.total_session_score), 0) as cuisine_score
+    // Optional: get cuisine score by summing individual user scores
+    OPTIONAL MATCH (u:User)-[sc:DESIRES_CUISINE {session_id: $session_id}]->(c:Cuisine)<-[:SERVES]-(r)
+    WITH r, coalesce(sum(sc.score), 0) as cuisine_score
     
     RETURN r.place_id as place_id, cuisine_score
     ORDER BY cuisine_score DESC

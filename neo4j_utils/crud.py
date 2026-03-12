@@ -120,14 +120,14 @@ class Neo4jConnector:
     def update_session_cuisine_score(self, session_id: str, cuisine_name: str):
         """
         Calculates score by summing up each session member's score from their [:DESIRES_CUISINE] edges 
-        tied to that specific cuisine and attaches it to the Session directly.
+        tied to that specific cuisine and attaches it to the Session directly for quick lookups.
         """
         query = """
         MATCH (u:User)-[rel:DESIRES_CUISINE {session_id: $session_id}]->(c:Cuisine {name: $cuisine_name})
         WITH sum(rel.score) as total_score, c
         MATCH (s:Session {id: $session_id})
         MERGE (s)-[s_rel:DESIRES_CUISINE]->(c)
-        SET s_rel.total_session_score = total_score
+        SET s_rel.score = total_score
         RETURN total_score
         """
         return self._execute_write(query, session_id=session_id, cuisine_name=cuisine_name)

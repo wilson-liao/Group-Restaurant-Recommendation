@@ -67,7 +67,7 @@ def get_cuisines_for_restaurant(display_name: str, types: list) -> list:
     # Ensure distinct matches
     if not matched_cuisines:
         matched_cuisines.add("Others")
-        
+    
     return sorted(list(matched_cuisines))
 
 if __name__ == '__main__':
@@ -78,15 +78,22 @@ if __name__ == '__main__':
     print(f"Found {len(restaurants)} restaurants. Beginning seed process...")
 
     types = [
-      "taiwanese_restaurant",
-      "dumpling_restaurant",
-      "chinese_restaurant",
+      "ramen_restaurant",
+      "tapas_restaurant",
+      "sushi_restaurant",
+      "asian_fusion_restaurant",
+      "vegetarian_restaurant",
+      "fusion_restaurant",
+      "asian_restaurant",
+      "yakitori_restaurant",
+      "japanese_restaurant",
+      "korean_restaurant",
       "restaurant",
       "food",
       "point_of_interest",
       "establishment"
     ]
-    name = 'Din Tai Fung'
+    name = 'RAKITORI Japanese Pub&Grill'
     cuisines = get_cuisines_for_restaurant(name, types)
     print(f'name: {name}, types: {types}, cuisines: {cuisines}', end = '\n\n')
 

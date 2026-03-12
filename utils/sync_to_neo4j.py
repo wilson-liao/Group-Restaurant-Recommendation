@@ -54,6 +54,7 @@ def main():
     print("Fetching Restaurants from PostgreSQL...")
     restaurants = db.query(Restaurant).all()
     print(f"Found {len(restaurants)} restaurants.")
+
     for r in restaurants:
         r_name = r.display_name or "Unknown"
         neo4j_conn.create_restaurant(place_id=r.place_id, name=r_name)
@@ -61,6 +62,9 @@ def main():
         # Calculate categories
         restrictions = get_dietary_restrictions_for_restaurant(r_name, r.types)
         cuisines = get_cuisines_for_restaurant(r_name, r.types)
+        if r_name == 'RAKITORI Japanese Pub&Grill':
+            print(f'Found RAKITORI')
+            print(cuisines)
         
         for res in restrictions:
             neo4j_conn.create_dietary_restriction(name=res)

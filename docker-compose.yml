@@ -46,6 +46,8 @@ services:
         condition: service_started
       neo4j:
         condition: service_started
+    volumes:
+      - .:/app
     command: >
       sh -c "
       echo 'Waiting for databases to initialize...' &&
